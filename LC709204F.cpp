@@ -1,7 +1,7 @@
 /**
  * @file LC709204F.cpp
  * @author Razvan Mocanu <razvan@mocanu.biz>
- * @version 1.0.0
+ * @version 1.0.1
  * @details LC709204F Battery Monitor library
  * @copyright MIT (see license.txt)
  */
@@ -34,11 +34,13 @@ bool LC709204F::init(lc709204f_apa_adjustment_t APAAdjustment, lc709204f_battery
     if (!setChangeOfTheParameter(batteryProfile))
         return false;
 
-    if (!setThermistors(false, false))
+    if (!setICPowerMode(LC709204F_POWER_MODE_OPERATE))
         return false;
 
-    if (!setICPowerMode(LC709204F_POWER_MODE_OPERATE))
-        return true;
+    if (!setBatteryStatus(0x0040))
+        return false;
+
+    return true;
 }
 
 /**
@@ -1055,7 +1057,7 @@ uint16_t LC709204F::getMaximumCellTemperatureTSENSE1(void) {
  * @return Floating point value from -30°C to 80°C
  */
 float LC709204F::getMaximumCellTemperature(void) {
-    uint16_t temp = getCellTemperatureTSENSE1();
+    uint16_t temp = getMaximumCellTemperatureTSENSE1();
     float temperature = map(temp, 0x980, 0xDCC, -300, 800);
     return temperature / 10.0;
 }
@@ -1183,7 +1185,7 @@ uint16_t LC709204F::getAmbientTemperatureTSENSE2(void) {
  * @return Floating point value from -30°C to 80°C
  */
 float LC709204F::getAmbientTemperature(void) {
-    uint16_t temp = getMinimumCellTemperatureTSENSE1();
+    uint16_t temp = getAmbientTemperatureTSENSE2();
     float temperature = map(temp, 0x980, 0xDCC, -300, 800);
     return temperature / 10.0;
 }
@@ -1235,11 +1237,11 @@ uint32_t LC709204F::getUserId(void) {
  */
 bool LC709204F::readWord(uint8_t command, uint16_t *data) {
     uint8_t reply[6];
-    reply[0] = LC709204F_I2CADDR * 2; // write byte
-    reply[1] = command;                       // command / register
-    reply[2] = reply[0] | 0x1;                // read byte
+    reply[0] = LC709204F_I2CADDR * 2;
+    reply[1] = command;
+    reply[2] = reply[0] | 0x1;
 
-    if (!writeThenRead(&command, 1, reply + 3, 3)) {
+    if (!i2cWriteThenRead(&command, 1, reply + 3, 3)) {
         return false;
     }
 
@@ -1308,8 +1310,8 @@ uint8_t LC709204F::crc8(uint8_t *data, int len) {
  * @param read_len
  * @return True on successful I2C operation
  */
-bool LC709204F::writeThenRead(const uint8_t *write_buffer, size_t write_len, uint8_t *read_buffer, size_t read_len) {
-    if (!i2cWrite(write_buffer, write_len)) {
+bool LC709204F::i2cWriteThenRead(const uint8_t *write_buffer, size_t write_len, uint8_t *read_buffer, size_t read_len, bool stop) {
+    if (!i2cWrite(write_buffer, write_len, stop)) {
         return false;
     }
 
@@ -1323,7 +1325,7 @@ bool LC709204F::writeThenRead(const uint8_t *write_buffer, size_t write_len, uin
  * @param len
  * @return True on successful I2C operation
  */
-bool LC709204F::i2cWrite(const uint8_t *buffer, size_t len) {
+bool LC709204F::i2cWrite(const uint8_t *buffer, size_t len, bool stop) {
     _wire->beginTransmission(LC709204F_I2CADDR);
 
     // Write the data itself
@@ -1331,7 +1333,7 @@ bool LC709204F::i2cWrite(const uint8_t *buffer, size_t len) {
         return false;
     }
 
-    if (_wire->endTransmission(false) == 0) {
+    if (_wire->endTransmission(stop) == 0) {
         return true;
     } else {
         return false;
@@ -1344,11 +1346,12 @@ bool LC709204F::i2cWrite(const uint8_t *buffer, size_t len) {
  * @param len
  * @return True on successful I2C operation
  */
-bool LC709204F::i2cRead(uint8_t *buffer, size_t len) {
+bool LC709204F::i2cRead(uint8_t *buffer, size_t len, bool stop) {
     size_t pos = 0;
     while (pos < len) {
         size_t read_len = (len - pos);
-        if (!_i2cRead(buffer + pos, read_len))
+        bool read_stop = (pos < (len - read_len)) ? false : stop;
+        if (!_i2cRead(buffer + pos, read_len, read_stop))
             return false;
         pos += read_len;
     }
@@ -1362,13 +1365,13 @@ bool LC709204F::i2cRead(uint8_t *buffer, size_t len) {
  * @param len
  * @return True on successful I2C operation
  */
-bool LC709204F::_i2cRead(uint8_t *buffer, size_t len) {
+bool LC709204F::_i2cRead(uint8_t *buffer, size_t len, bool stop) {
 #if defined(TinyWireM_h)
     size_t recv = _wire->requestFrom((uint8_t)LC709204F_I2CADDR, (uint8_t)len);
 #elif defined(ARDUINO_ARCH_MEGAAVR)
-    size_t recv = _wire->requestFrom(LC709204F_I2CADDR, len);
+    size_t recv = _wire->requestFrom(LC709204F_I2CADDR, len, stop);
 #else
-    size_t recv = _wire->requestFrom((uint8_t) LC709204F_I2CADDR, (uint8_t) len);
+    size_t recv = _wire->requestFrom((uint8_t) LC709204F_I2CADDR, (uint8_t) len, (uint8_t) stop);
 #endif
 
     if (recv != len) {

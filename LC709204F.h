@@ -1,7 +1,7 @@
 /**
  * @file LC709204F.cpp
  * @author Razvan Mocanu <razvan@mocanu.biz>
- * @version 1.0.0
+ * @version 1.0.1
  * @details LC709204F Battery Monitor library
  * @copyright MIT (see LICENSE.md)
  */
@@ -280,13 +280,13 @@ protected:
 
     bool writeWord(uint8_t command, uint16_t data);
 
-    bool writeThenRead(const uint8_t *write_buffer, size_t write_len, uint8_t *read_buffer, size_t read_len);
+    bool i2cWriteThenRead(const uint8_t *write_buffer, size_t write_len, uint8_t *read_buffer, size_t read_len, bool stop = false);
 
-    bool i2cWrite(const uint8_t *buffer, size_t len);
+    bool i2cWrite(const uint8_t *buffer, size_t len, bool stop = true);
 
-    bool i2cRead(uint8_t *buffer, size_t len);
+    bool i2cRead(uint8_t *buffer, size_t len, bool stop = true);
 
-    bool _i2cRead(uint8_t *buffer, size_t len);
+    bool _i2cRead(uint8_t *buffer, size_t len, bool stop = true);
 
     uint8_t crc8(uint8_t *data, int len);
 };
