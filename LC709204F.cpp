@@ -1,7 +1,7 @@
 /**
  * @file LC709204F.cpp
  * @author Razvan Mocanu <razvan@mocanu.biz>
- * @version 1.0.1
+ * @version 1.0.0
  * @details LC709204F Battery Monitor library
  * @copyright MIT (see license.txt)
  */
